@@ -144,7 +144,7 @@ class SubscribeSerializer(ModelSerializer):
     def get_is_subscribed(self, obj):
         return Subscribe.objects.filter(
             user=obj.user, author=obj.author
-            ).exists()
+        ).exists()
 
 
 class CartSerializer(serializers.ModelSerializer):
