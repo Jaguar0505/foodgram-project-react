@@ -5,7 +5,6 @@ from django.shortcuts import HttpResponse, get_object_or_404
 from django_filters import rest_framework as filters
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
@@ -40,7 +39,6 @@ class RecipeViewSet(ModelViewSet):
     "Вьюха для рецептов"
     queryset = Recipe.objects.all()
     serializer_class = RecipeSerilizers
-    pagination_class = PageNumberPagination
     filter_backends = [filters.DjangoFilterBackend]
     filterset_class = RecipeFilter
     permission_classes = [permissions.IsAuthenticated]
@@ -63,16 +61,6 @@ class RecipeViewSet(ModelViewSet):
         if request.method == 'POST':
             return self.add_fav(Favorite, request.user, pk)
         return self.delete_fav(Favorite, request.user, pk)
-
-    @action(
-        detail=True,
-        methods=['post', 'delete'],
-        permission_classes=[permissions.IsAuthenticated]
-    )
-    def add_to_cart(self, request, pk):
-        if request.method == 'POST':
-            return self.add_fav(Cart, request.user, pk)
-        return self.delete_fav(Cart, request.user, pk)
 
     def add_fav(self, model, user, pk):
         if model.objects.filter(user=user, recipe__id=pk).exists():

@@ -1,66 +1,52 @@
-from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
-from rest_framework import permissions, status, viewsets
+from rest_framework import permissions, status
 from rest_framework.decorators import action
-from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
+from djoser.views import UserViewSet
+from users.serializers import SubscribeSerializer
 
-from api.serializers import SubscribeSerializer
-
-from .models import Subscribe
-from .serializers import RegisterUserSerializer, UserSerilizer
-
-User = get_user_model()
+from .models import Subscribe, User
+from .serializers import CustomUserSerializer
 
 
-class UserViewSet(viewsets.ModelViewSet):
+class UserViewSet(UserViewSet):
     """Viewset для пользователей"""
-    queryset = User.objects.all().order_by('id')
-    serializer_class = UserSerilizer
-    pagination_class = PageNumberPagination
-
-    def get_serializer_class(self):
-        if self.action == 'create':
-            return RegisterUserSerializer
-        return UserSerilizer
-
-    def get_object(self):
-        user = self.request.user
-        pk = self.kwargs['pk']
-
-        if pk == 'me' and user.is_authenticated:
-            return user
-
-        return get_object_or_404(User, pk=pk)
+    queryset = User.objects.all()
+    serializer_class = CustomUserSerializer
 
     def subscribed(self, serializer, id=None):
+        """Подписывает пользователя на автора"""
         follower = get_object_or_404(User, id=id)
-        if self.request.user == follower:
-            return Response({'message': 'Нельзя подписаться на самого себя'},
-                            status=status.HTTP_400_BAD_REQUEST)
-        follow = Subscribe.objects.get_or_create(user=self.request.user,
-                                                 author=follower)
-        serializer = SubscribeSerializer(follow[0])
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        follow = Subscribe.objects.get_or_create(
+                 user=self.request.user, author=follower)
+        if follow:
+            return Response(
+                {'message': 'Вы подписались на пользователя.'},
+                status=status.HTTP_201_CREATED)
 
-    def unsubscribed(self, serializer, id=None):
+    @action(
+        detail=True,
+        methods=('post',),
+        permission_classes=(permissions.IsAuthenticated,)
+    )
+    def subscribe(self, serializer, id=None):
+        """Добавляем подписку"""
+        return self.subscribed(serializer, id)
+
+    @subscribe.mapping.delete
+    def subscribe_delete(self, request, id=None):
+        """Удаляем подписку"""
         follower = get_object_or_404(User, id=id)
         Subscribe.objects.filter(user=self.request.user,
                                  author=follower).delete()
         return Response({'message': 'Вы отписаны'},
                         status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=['post', 'delete'],
-            permission_classes=[permissions.IsAuthenticated])
-    def subscribe(self, serializer, pk=None):
-        if self.request.method == 'DELETE':
-            return self.unsubscribed(serializer, pk)
-        return self.subscribed(serializer, pk)
-
     @action(detail=False, methods=['get'],
             permission_classes=[permissions.IsAuthenticated])
-    def subscriptions(self, serializer):
-        following = Subscribe.objects.filter(user=self.request.user)
-        pages = self.paginate_queryset(following)
+    def subscriptions(self, request):
+        """Показывает подписки"""
+        pages = self.paginate_queryset(
+            User.objects.filter(author__user=request.user))
         serializer = SubscribeSerializer(pages, many=True)
         return self.get_paginated_response(serializer.data)

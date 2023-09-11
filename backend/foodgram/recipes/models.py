@@ -79,7 +79,6 @@ class Recipe(models.Model):
         on_delete=models.CASCADE,
         related_name='recipes',
         verbose_name='Автор рецепта',
-        default=None
     )
     cooking_time = models.PositiveIntegerField(
         verbose_name='Время приготовления (в минутах)',
@@ -96,6 +95,7 @@ class Recipe(models.Model):
 
 
 class IngridientForRecipe(models.Model):
+    """Модель ингредиента в рецепте"""
     recipe = models.ForeignKey(
         Recipe,
         on_delete=models.CASCADE,
@@ -114,8 +114,8 @@ class IngridientForRecipe(models.Model):
     )
 
     class Meta:
-        verbose_name = 'Ингридиент'
-        verbose_name_plural = 'Количество ингридиентов'
+        verbose_name = 'Ингредиент'
+        verbose_name_plural = 'Количество ингредиентов'
 
     def __str__(self) -> str:
         return f'{self.amount} {self.ingredient}'

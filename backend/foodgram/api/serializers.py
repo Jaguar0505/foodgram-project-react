@@ -3,13 +3,10 @@ import base64
 
 from django.core.files.base import ContentFile
 from rest_framework import serializers
-from rest_framework.serializers import (Field, ModelSerializer, ReadOnlyField,
-                                        SerializerMethodField)
 
 from recipes.models import (Cart, Favorite, Ingredient, IngridientForRecipe,
                             Recipe, Tag)
-from users.models import User
-from users.serializers import RecipeAddSerializer, Subscribe, UserSerilizer
+from users.serializers import CustomUserSerializer, RecipeAddSerializer
 
 
 class Base64ImageField(serializers.ImageField):
@@ -64,7 +61,7 @@ class IngridientInRecipe(serializers.ModelSerializer):
 class RecipeSerilizers(serializers.ModelSerializer):
     """Сериализатор для чтения(просмотра)рецептов."""
     tags = TagSerializer(many=True)
-    author = UserSerilizer(read_only=True)
+    author = CustomUserSerializer(read_only=True)
     ingredients = IngridientInRecipe(many=True, source='ingredient_for_recipe')
     is_favorited = serializers.SerializerMethodField(
         method_name='get_is_favorited'
@@ -98,55 +95,6 @@ class RecipeSerilizers(serializers.ModelSerializer):
         return False
 
 
-class RecipeSubscribeUserField(Field):
-    """Сериализатор для рецептов в подписках."""
-
-    def get_attribute(self, instance):
-        """Получить атрибут."""
-        return Recipe.objects.filter(author=instance.author)
-
-    def to_representation(self, recipes_list):
-        """Преобразовать в JSON."""
-        recipes_data = []
-        for recipes in recipes_list:
-            recipes_data.append(
-                {
-                    "id": recipes.id,
-                    "name": recipes.name,
-                    "image": recipes.image.url,
-                    "cooking_time": recipes.cooking_time,
-                }
-            )
-        return recipes_data
-
-
-class SubscribeSerializer(ModelSerializer):
-    """Сериализатор для подписок."""
-    recipes = RecipeSubscribeUserField()
-    recipes_count = SerializerMethodField(read_only=True)
-    id = ReadOnlyField(source='author.id')
-    email = ReadOnlyField(source='author.email')
-    username = ReadOnlyField(source='author.username')
-    first_name = ReadOnlyField(source='author.first_name')
-    last_name = ReadOnlyField(source='author.last_name')
-    is_subscribed = SerializerMethodField()
-
-    class Meta:
-        model = User
-        fields = ('email', 'id', 'username',
-                  'first_name', 'last_name',
-                  'is_subscribed',
-                  'recipes', 'recipes_count')
-
-    def get_recipes_count(self, obj):
-        return Recipe.objects.filter(author=obj.author).count()
-
-    def get_is_subscribed(self, obj):
-        return Subscribe.objects.filter(
-            user=obj.user, author=obj.author
-        ).exists()
-
-
 class CartSerializer(serializers.ModelSerializer):
     """Сериализатор для создания корзины"""
 
@@ -174,7 +122,7 @@ class AddIngredientSerializer(serializers.ModelSerializer):
 class CreateRecipeSerializer(serializers.ModelSerializer):
     """Сериализатор создания или обновления рецепта."""
 
-    author = UserSerilizer(read_only=True)
+    author = CustomUserSerializer(read_only=True)
     ingredients = AddIngredientSerializer(many=True)
     tags = TagSerializer
     image = Base64ImageField()
@@ -200,15 +148,6 @@ class CreateRecipeSerializer(serializers.ModelSerializer):
                 recipe=recipe,
                 amount=ingredient['amount']
             ) for ingredient in ingredients]
-        )
-
-    def create_tags(self, tags, recipe):
-        """Создание для тегов."""
-        Tag.objects.bulk_create(
-            [Tag(
-                tags=Tag.objects.get(name=tag_data),
-                recipe=recipe,
-            ) for tag_data in tags]
         )
 
     def create(self, validated_data):

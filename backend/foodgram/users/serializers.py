@@ -1,61 +1,28 @@
-import logging
-
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
-from rest_framework.validators import UniqueValidator
-
+from djoser.serializers import UserSerializer
 from recipes.models import Recipe
-
+from rest_framework.exceptions import ValidationError
+from rest_framework import status
 from .models import Subscribe
 
 User = get_user_model()
 
-logger = logging.getLogger(__name__)
 
-
-class RegisterUserSerializer(serializers.ModelSerializer):
-    """Сериализатор формы регистрации пользователя"""
-    username = serializers.CharField(
-        validators=[UniqueValidator(queryset=User.objects.all())]
-    )
-    password = serializers.CharField(
-        write_only=True,
-        required=True,
-        min_length=8,
-        help_text="Минимум 8 символов.",
-    )
-    email = serializers.EmailField(
-        validators=[UniqueValidator(queryset=User.objects.all())]
-    )
+class CustomUserSerializer(UserSerializer):
+    """Сериализатор пользователя"""
+    is_subscribed = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = User
-        fields = ('email', 'id', 'username',
-                  "password", 'first_name', 'last_name')
-
-    def create(self, validated_data):
-        password = validated_data.pop('password')
-        user = User.objects.create_user(**validated_data, password=password)
-        return user
-
-
-class UserSerilizer(serializers.ModelSerializer):
-    """Пользовательский сериализатор"""
-    is_subscribed = serializers.SerializerMethodField()
-
-    class Meta:
-        model = User
-        fields = ('email', 'id', 'username', 'first_name',
-                  'last_name', 'is_subscribed')
-
-    def create(self, validated_data):
-        user = User(
-            email=validated_data['email'],
-            username=validated_data['username']
+        fields = (
+            'email',
+            'id',
+            'username',
+            'first_name',
+            'last_name',
+            'is_subscribed',
         )
-        user.set_password(validated_data['password'])
-        user.save()
-        return user
 
     def get_is_subscribed(self, obj):
         """Проверка подписки пользователей."""
@@ -64,6 +31,50 @@ class UserSerilizer(serializers.ModelSerializer):
             return False
         return Subscribe.objects.filter(user=request.user,
                                         author=obj).exists()
+
+
+class SubscribeSerializer(CustomUserSerializer):
+    """Сериализатор для подписок."""
+    recipes = serializers.SerializerMethodField()
+    recipes_count = serializers.SerializerMethodField()
+
+    class Meta(CustomUserSerializer.Meta):
+        fields = CustomUserSerializer.Meta.fields + (
+            'recipes_count', 'recipes'
+        )
+        read_only_fields = (
+            'email',
+            'username',
+            'first_name',
+            'last_name',
+        )
+
+    def validate(self, data):
+        """Валидация подписки повторной/самого на себя"""
+        author = self.instance
+        user = self.context.get('request').user
+        if Subscribe.objects.filter(author=author, user=user).exists():
+            raise ValidationError(
+                detail='Вы уже подписаны на этого пользователя!',
+                code=status.HTTP_400_BAD_REQUEST
+            )
+        if user == author:
+            raise ValidationError(
+                detail='Вы не можете подписаться на самого себя!',
+                code=status.HTTP_400_BAD_REQUEST
+            )
+
+        return data
+
+    def get_recipes_count(self, obj):
+        """Получаем кол-во рецептов"""
+        return Recipe.objects.filter(author=obj).count()
+
+    def get_recipes(self, obj):
+        """Получаем рецепты"""
+        recipes = obj.recipes.all()
+        serializer = RecipeAddSerializer(recipes, many=True, read_only=True)
+        return serializer.data
 
 
 class RecipeAddSerializer(serializers.ModelSerializer):
