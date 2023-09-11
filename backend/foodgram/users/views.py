@@ -1,8 +1,9 @@
 from django.shortcuts import get_object_or_404
+from djoser.views import UserViewSet
 from rest_framework import permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from djoser.views import UserViewSet
+
 from users.serializers import SubscribeSerializer
 
 from .models import Subscribe, User
@@ -18,7 +19,7 @@ class UserViewSet(UserViewSet):
         """Подписывает пользователя на автора"""
         follower = get_object_or_404(User, id=id)
         follow = Subscribe.objects.get_or_create(
-                 user=self.request.user, author=follower)
+            user=self.request.user, author=follower)
         if follow:
             return Response(
                 {'message': 'Вы подписались на пользователя.'},

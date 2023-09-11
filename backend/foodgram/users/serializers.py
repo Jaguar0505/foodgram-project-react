@@ -1,9 +1,10 @@
 from django.contrib.auth import get_user_model
-from rest_framework import serializers
 from djoser.serializers import UserSerializer
-from recipes.models import Recipe
+from rest_framework import serializers, status
 from rest_framework.exceptions import ValidationError
-from rest_framework import status
+
+from recipes.models import Recipe
+
 from .models import Subscribe
 
 User = get_user_model()
