@@ -31,7 +31,9 @@ class IngredientViewSet(viewsets.ModelViewSet):
     filter_backends = (filters.DjangoFilterBackend,)
     filterset_class = IngredientFilter
 
-### ПЕРЕДЕЛАЛ ПО ПРАВКАМ КОТОРЫЕ БЫЛИ В USERS.VIEWS. ###
+# ПЕРЕДЕЛАЛ ПО ПРАВКАМ КОТОРЫЕ БЫЛИ В USERS.VIEWS
+
+
 class RecipeViewSet(ModelViewSet):
     queryset = Recipe.objects.all()
     serializer_class = RecipeSerilizers

@@ -23,10 +23,10 @@ class UserViewSet(UserViewSet):
         user = request.user
         follower = get_object_or_404(User, id=id)
         serializer = SubscribeSerializer(
-                follower,
-                data=request.data,
-                context={"request": request}
-            )
+            follower,
+            data=request.data,
+            context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
         Subscribe.objects.create(user=user, author=follower)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
