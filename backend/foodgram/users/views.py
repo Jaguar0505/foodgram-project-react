@@ -11,42 +11,37 @@ from .serializers import CustomUserSerializer
 
 
 class UserViewSet(UserViewSet):
-    """Viewset для пользователей"""
     queryset = User.objects.all()
     serializer_class = CustomUserSerializer
-
-    def subscribed(self, serializer, id=None):
-        """Подписывает пользователя на автора"""
-        follower = get_object_or_404(User, id=id)
-        follow = Subscribe.objects.get_or_create(
-            user=self.request.user, author=follower)
-        if follow:
-            return Response(
-                {'message': 'Вы подписались на пользователя.'},
-                status=status.HTTP_201_CREATED)
 
     @action(
         detail=True,
         methods=('post',),
         permission_classes=(permissions.IsAuthenticated,)
     )
-    def subscribe(self, serializer, id=None):
-        """Добавляем подписку"""
-        return self.subscribed(serializer, id)
+    def subscribe(self, request, id=None):
+        user = request.user
+        follower = get_object_or_404(User, id=id)
+        serializer = SubscribeSerializer(
+                follower,
+                data=request.data,
+                context={"request": request}
+            )
+        serializer.is_valid(raise_exception=True)
+        Subscribe.objects.create(user=user, author=follower)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @subscribe.mapping.delete
     def subscribe_delete(self, request, id=None):
-        """Удаляем подписку"""
         follower = get_object_or_404(User, id=id)
         Subscribe.objects.filter(user=self.request.user,
                                  author=follower).delete()
         return Response({'message': 'Вы отписаны'},
-                        status=status.HTTP_200_OK)
+                        status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=False, methods=['get'],
             permission_classes=[permissions.IsAuthenticated])
     def subscriptions(self, request):
-        """Показывает подписки"""
         pages = self.paginate_queryset(
             User.objects.filter(author__user=request.user))
         serializer = SubscribeSerializer(pages, many=True)

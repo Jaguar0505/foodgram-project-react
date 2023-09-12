@@ -11,22 +11,19 @@ from rest_framework.viewsets import ModelViewSet
 from api.filter import IngredientFilter, RecipeFilter
 from recipes.models import (Cart, Favorite, Ingredient, IngridientForRecipe,
                             Recipe, Tag)
-from users.serializers import RecipeAddSerializer
 
 from .serializers import (CartSerializer, CreateRecipeSerializer,
-                          IngredientSerializer, RecipeSerilizers,
-                          TagSerializer)
+                          FavoriteSerializer, IngredientSerializer,
+                          RecipeSerilizers, TagSerializer)
 
 
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
-    """API для работы с тегами."""
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
     pagination_class = None
 
 
 class IngredientViewSet(viewsets.ModelViewSet):
-    """Вьюсет для модели ингредиентов."""
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
     permission_classes = [permissions.AllowAny]
@@ -34,9 +31,8 @@ class IngredientViewSet(viewsets.ModelViewSet):
     filter_backends = (filters.DjangoFilterBackend,)
     filterset_class = IngredientFilter
 
-
+### ПЕРЕДЕЛАЛ ПО ПРАВКАМ КОТОРЫЕ БЫЛИ В USERS.VIEWS. ###
 class RecipeViewSet(ModelViewSet):
-    "Вьюха для рецептов"
     queryset = Recipe.objects.all()
     serializer_class = RecipeSerilizers
     filter_backends = [filters.DjangoFilterBackend]
@@ -44,7 +40,6 @@ class RecipeViewSet(ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_serializer_class(self):
-        """Переопределение на основании выбора действия"""
         if self.action in ['create', 'partial_update', 'update']:
             return CreateRecipeSerializer
         return RecipeSerilizers
@@ -54,53 +49,54 @@ class RecipeViewSet(ModelViewSet):
 
     @action(
         detail=True,
-        methods=['POST', 'DELETE'],
+        methods=['POST'],
         permission_classes=[permissions.IsAuthenticated]
     )
     def favorite(self, request, pk):
-        if request.method == 'POST':
-            return self.add_fav(Favorite, request.user, pk)
-        return self.delete_fav(Favorite, request.user, pk)
-
-    def add_fav(self, model, user, pk):
-        if model.objects.filter(user=user, recipe__id=pk).exists():
-            return Response({'errors': 'Рецепт уже был добавлен!'},
-                            status=status.HTTP_400_BAD_REQUEST)
-        recipe = get_object_or_404(Recipe, id=pk)
-        model.objects.create(user=user, recipe=recipe)
-        serializer = RecipeAddSerializer(recipe)
+        # Переделал под serializer.is_valid(raise_exception=True)
+        user = request.user
+        recipe = get_object_or_404(Recipe, pk=pk)
+        serializer = FavoriteSerializer(recipe,
+                                        data=request.data,
+                                        context={'request': request}, )
+        serializer.is_valid(raise_exception=True)
+        Favorite.objects.create(user=user, recipe=recipe)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-    def delete_fav(self, model, user, pk):
-        obj = model.objects.filter(user=user, recipe__id=pk)
-        if obj.exists():
-            obj.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        return Response({'errors': 'Рецепт уже был удален!'},
-                        status=status.HTTP_400_BAD_REQUEST)
+    @favorite.mapping.delete
+    # добавил mapping.delete
+    def favorite_delete(self, request, pk):
+        recipe = get_object_or_404(Recipe, pk=pk)
+        Favorite.objects.filter(user=request.user, recipe=recipe).delete()
+        return Response({'message': 'Из избранного удален'},
+                        status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=True, methods=['POST', 'DELETE'],
+    @action(detail=True, methods=['POST'],
             permission_classes=(permissions.IsAuthenticated,))
     def shopping_cart(self, request, pk):
-        """Добавление рецепта в список покупок"""
+        # Переделал под serializer.is_valid(raise_exception=True)
+        user = request.user
+        recipe = get_object_or_404(Recipe, pk=pk)
+        serializer = CartSerializer(recipe,
+                                    data=request.data,
+                                    context={'request': request}, )
+        serializer.is_valid(raise_exception=True)
+        Cart.objects.create(user=user, recipe=recipe)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        data = {'recipe': pk,
-                'user': request.user.id}
-        if request.method == 'POST':
-            serializer = CartSerializer(data=data)
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
-            return Response(
-                serializer.data, status=status.HTTP_201_CREATED)
-        Cart.objects.filter(**data).delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+    @shopping_cart.mapping.delete
+    # добавил mapping.delete
+    def shoping_cart_delete(self, request, pk):
+        recipe = get_object_or_404(Recipe, pk=pk)
+        Cart.objects.filter(user=request.user, recipe=recipe).delete()
+        return Response({'message': 'Из рецепта удален'},
+                        status=status.HTTP_204_NO_CONTENT)
 
     @action(
         detail=False,
         permission_classes=(permissions.IsAuthenticated,)
     )
     def download_shopping_cart(self, request):
-        """Скачать список покупок в *txt."""
         user = request.user
         if not user.cart.exists():
             return Response(status.HTTP_400_BAD_REQUEST)
