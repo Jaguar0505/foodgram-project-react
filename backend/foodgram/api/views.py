@@ -21,14 +21,14 @@ from .serializers import (CartSerializer, CreateRecipeSerializer,
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [permissions.AllowAny]
     pagination_class = None
 
 
 class IngredientViewSet(viewsets.ModelViewSet):
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [permissions.AllowAny]
     pagination_class = None
     filter_backends = (filters.DjangoFilterBackend,)
     filterset_class = IngredientFilter
@@ -52,7 +52,7 @@ class RecipeViewSet(ModelViewSet):
     serializer_class = RecipeSerilizers
     filter_backends = [filters.DjangoFilterBackend]
     filterset_class = RecipeFilter
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [permissions.AllowAny]
 
     def get_serializer_class(self):
         if self.request.method in SAFE_METHODS:
