@@ -1,9 +1,10 @@
 from datetime import datetime
 
-from django.db.models import Sum
+from django.db.models import Sum, OuterRef, Subquery
 from django.shortcuts import HttpResponse, get_object_or_404
 from django_filters import rest_framework as filters
 from rest_framework import permissions, status, viewsets
+from rest_framework.permissions import SAFE_METHODS
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
@@ -31,23 +32,34 @@ class IngredientViewSet(viewsets.ModelViewSet):
     filter_backends = (filters.DjangoFilterBackend,)
     filterset_class = IngredientFilter
 
-# ПЕРЕДЕЛАЛ ПО ПРАВКАМ КОТОРЫЕ БЫЛИ В USERS.VIEWS
-
 
 class RecipeViewSet(ModelViewSet):
-    queryset = Recipe.objects.all()
+    queryset = Recipe.objects.annotate(
+        favorited=Subquery(
+            Favorite.objects.filter(
+                user=OuterRef('author'),
+                recipe=OuterRef('pk')
+            ).values('pk')[:1]
+        ),
+        in_shopping_cart=Subquery(
+            Cart.objects.filter(
+                user=OuterRef('author'),
+                recipe=OuterRef('pk')
+            ).values('pk')[:1]
+        )
+    )
     serializer_class = RecipeSerilizers
     filter_backends = [filters.DjangoFilterBackend]
     filterset_class = RecipeFilter
     permission_classes = [permissions.IsAuthenticated]
 
     def get_serializer_class(self):
-        if self.action in ['create', 'partial_update', 'update']:
-            return CreateRecipeSerializer
-        return RecipeSerilizers
+        if self.request.method in SAFE_METHODS:
+            return RecipeSerilizers
+        return CreateRecipeSerializer
 
-    def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
+    # def perform_create(self, serializer):
+    #     serializer.save(author=self.request.user)
 
     @action(
         detail=True,
@@ -55,14 +67,12 @@ class RecipeViewSet(ModelViewSet):
         permission_classes=[permissions.IsAuthenticated]
     )
     def favorite(self, request, pk):
-        # Переделал под serializer.is_valid(raise_exception=True)
-        user = request.user
         recipe = get_object_or_404(Recipe, pk=pk)
         serializer = FavoriteSerializer(recipe,
                                         data=request.data,
                                         context={'request': request}, )
         serializer.is_valid(raise_exception=True)
-        Favorite.objects.create(user=user, recipe=recipe)
+        Favorite.objects.create(user=request.user, recipe=recipe)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @favorite.mapping.delete
@@ -76,14 +86,12 @@ class RecipeViewSet(ModelViewSet):
     @action(detail=True, methods=['POST'],
             permission_classes=(permissions.IsAuthenticated,))
     def shopping_cart(self, request, pk):
-        # Переделал под serializer.is_valid(raise_exception=True)
-        user = request.user
         recipe = get_object_or_404(Recipe, pk=pk)
         serializer = CartSerializer(recipe,
                                     data=request.data,
                                     context={'request': request}, )
         serializer.is_valid(raise_exception=True)
-        Cart.objects.create(user=user, recipe=recipe)
+        Cart.objects.create(user=request.user, recipe=recipe)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @shopping_cart.mapping.delete
@@ -109,7 +117,16 @@ class RecipeViewSet(ModelViewSet):
             'ingredient__name',
             'ingredient__measurement_unit'
         ).annotate(cart_amount=Sum('amount'))
+        shopping_list = self.generate_shopping_list(user, ingredients)
 
+        filename = f'{user.username}_shopping_list.txt'
+        response = HttpResponse(shopping_list, content_type='text/plain')
+        response['Content-Disposition'] = f'attachment; filename={filename}'
+
+        return response
+
+    @staticmethod
+    def generate_shopping_list(user, ingredients):
         today = datetime.today()
         shopping_list = (
             f'Список покупок для: {user.get_full_name()}\n\n'
@@ -127,4 +144,4 @@ class RecipeViewSet(ModelViewSet):
         response = HttpResponse(shopping_list, content_type='text/plain')
         response['Content-Disposition'] = f'attachment; filename={filename}'
 
-        return response
+        return shopping_list

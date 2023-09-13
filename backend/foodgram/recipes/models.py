@@ -90,6 +90,8 @@ class Recipe(models.Model):
             MaxValueValidator(5999, message="Введите значение < 5999.")
         ]
     )
+    is_favorited = models.BooleanField(default=False)
+    is_in_shopping_cart = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = 'Рецепт'
