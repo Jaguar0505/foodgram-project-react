@@ -7,7 +7,7 @@ from rest_framework import permissions, status, viewsets
 from rest_framework.permissions import SAFE_METHODS
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet
+# from rest_framework.viewsets import ModelViewSet
 
 from api.filter import IngredientFilter, RecipeFilter
 from recipes.models import (Cart, Favorite, Ingredient, IngridientForRecipe,
@@ -34,7 +34,7 @@ class IngredientViewSet(viewsets.ModelViewSet):
     filterset_class = IngredientFilter
 
 
-class RecipeViewSet(ModelViewSet):
+class RecipeViewSet(viewsets.ModelViewSet):
     queryset = Recipe.objects.annotate(
         favorited=Subquery(
             Favorite.objects.filter(
