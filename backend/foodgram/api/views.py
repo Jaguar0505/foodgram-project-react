@@ -21,13 +21,14 @@ from .serializers import (CartSerializer, CreateRecipeSerializer,
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     pagination_class = None
 
 
 class IngredientViewSet(viewsets.ModelViewSet):
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     pagination_class = None
     filter_backends = (filters.DjangoFilterBackend,)
     filterset_class = IngredientFilter
@@ -51,15 +52,12 @@ class RecipeViewSet(ModelViewSet):
     serializer_class = RecipeSerilizers
     filter_backends = [filters.DjangoFilterBackend]
     filterset_class = RecipeFilter
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get_serializer_class(self):
         if self.request.method in SAFE_METHODS:
             return RecipeSerilizers
         return CreateRecipeSerializer
-
-    # def perform_create(self, serializer):
-    #     serializer.save(author=self.request.user)
 
     @action(
         detail=True,
@@ -76,7 +74,6 @@ class RecipeViewSet(ModelViewSet):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @favorite.mapping.delete
-    # добавил mapping.delete
     def favorite_delete(self, request, pk):
         recipe = get_object_or_404(Recipe, pk=pk)
         Favorite.objects.filter(user=request.user, recipe=recipe).delete()
@@ -95,7 +92,6 @@ class RecipeViewSet(ModelViewSet):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @shopping_cart.mapping.delete
-    # добавил mapping.delete
     def shoping_cart_delete(self, request, pk):
         recipe = get_object_or_404(Recipe, pk=pk)
         Cart.objects.filter(user=request.user, recipe=recipe).delete()

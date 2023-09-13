@@ -142,13 +142,6 @@ class CreateRecipeSerializer(serializers.ModelSerializer):
             ingredient_objects.append(ingredient_for_recipe)
 
         IngridientForRecipe.objects.bulk_create(ingredient_objects)
-        # IngridientForRecipe.objects.bulk_create(
-        #     [IngridientForRecipe(
-        #         ingredient=Ingredient.objects.get(id=ingredient['id']),
-        #         recipe=recipe,
-        #         amount=ingredient['amount']
-        #     ) for ingredient in ingredients]
-        # )
 
     def create(self, validated_data):
         author = self.context.get('request').user
@@ -168,7 +161,6 @@ class CreateRecipeSerializer(serializers.ModelSerializer):
         instance.ingredients.clear()
         self.create_ingredients_amounts(recipe=instance,
                                         ingredients=ingredients)
-        # instance.save()
         return super().update(instance, validated_data)
 
     def to_representation(self, instance):
