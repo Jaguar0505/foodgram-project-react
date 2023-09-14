@@ -130,3 +130,5 @@ dmypy.json
 
 # .idea
 .idea
+#others
+node_modules
