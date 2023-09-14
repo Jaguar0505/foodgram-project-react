@@ -62,7 +62,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.getenv('DB_NAME', 'foodgram'),
         'USER': os.getenv('POSTGRES_USER', 'foodgram_user'),
-        'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'foodgram_password'),
+        'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'django'),
         'HOST': 'db',
         'PORT': os.getenv('DB_PORT', 5432)
     }
@@ -124,6 +124,6 @@ DJOSER = {
 
     'PERMISSIONS': {
         'user': ['djoser.permissions.CurrentUserOrAdminOrReadOnly'],
-        'user_list': ['rest_framework.permissions.IsAuthenticatedOrReadOnly'],
+        'user_list': ['rest_framework.permissions.AllowAny'],
     },
 }
